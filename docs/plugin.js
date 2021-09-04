@@ -1,1 +1,137 @@
-(function(){"use strict";const{ActionTypes:e}=cumcord.modules.common.constants,{getChannelId:n}=cumcord.modules.webpackModules.findByProps("getChannelId","getLastSelectedChannelId","getVoiceChannelId"),{FluxDispatcher:s}=cumcord.modules.common,{getChannel:t}=cumcord.modules.webpackModules.findByProps("getChannel"),{getMessages:i}=cumcord.modules.webpackModules.findByProps("getMessages");let l=new class{constructor(){this.messageIndex=-1,this.activeChannel=n(),this.replyingToMessage=void 0,this.QRSymbol=Symbol("quickreply_deletePendingReply_int")}getCurrentChannel(){return t(n())}async createPendingReply(n,t,i,l){void 0===l&&(l=null!==n.guild_id),s.dirtyDispatch({type:e.CREATE_PENDING_REPLY,channel:n,message:t,shouldMention:i,showMentionToggle:l})}async deletePendingReply(t){s.dirtyDispatch({type:e.DELETE_PENDING_REPLY,channelId:n(),...t})}channelSelect=e=>{this.activeChannel!==e.channelId&&(this.activeChannel=e.channelId,this.messageIndex=-1)};onCreatePendingReply=e=>{this.replyingToMessage!==e.message.id&&(this.replyingToMessage=e.message.id)};onDeletePendingReply=e=>{this.replyingToMessage=void 0,e[this.QRSymbol]||(this.messageIndex=-1)};keyDown=async e=>{if(!e.ctrlKey)return;if("ArrowUp"!==e.key&&"ArrowDown"!==e.key)return;let s=(await i(n())).toArray().reverse(),t=s.findIndex((e=>e.id===this.replyingToMessage))||0;if("ArrowUp"===e.key?this.messageIndex=t+1:"ArrowDown"===e.key&&(this.messageIndex=t-1),this.messageIndex>s.length&&(this.messageIndex=s.length),this.messageIndex<0)return this.deletePendingReply();let l=s[this.messageIndex];this.deletePendingReply({[this.QRSymbol]:!0}),this.createPendingReply(this.getCurrentChannel(),l,!0)};startPlugin(){s.subscribe(e.CHANNEL_SELECT,this.channelSelect),s.subscribe(e.CREATE_PENDING_REPLY,this.onCreatePendingReply),s.subscribe(e.DELETE_PENDING_REPLY,this.onDeletePendingReply),window.addEventListener("keydown",this.keyDown)}pluginWillUnload(){s.unsubscribe(e.CHANNEL_SELECT,this.channelSelect),s.unsubscribe(e.CREATE_PENDING_REPLY,this.onCreatePendingReply),s.unsubscribe(e.DELETE_PENDING_REPLY,this.onDeletePendingReply),window.removeEventListener("keydown",this.keyDown)}};return{onLoad:l.startPlugin,onUnload:l.pluginWillUnload}})();
+;(function () {
+  'use strict'
+  const { ActionTypes } = cumcord.modules.common.constants
+  const { getChannelId } = cumcord.modules.webpackModules.findByProps(
+    'getChannelId',
+    'getLastSelectedChannelId',
+    'getVoiceChannelId'
+  )
+  const { FluxDispatcher: Dispatcher } = cumcord.modules.common
+
+  const { getChannel } =
+    cumcord.modules.webpackModules.findByProps('getChannel')
+  const { getMessages } =
+    cumcord.modules.webpackModules.findByProps('getMessages')
+
+  class QuickReply {
+    constructor() {
+      this.messageIndex = -1
+      this.activeChannel = getChannelId()
+      this.replyingToMessage = undefined
+
+      this.QRSymbol = Symbol('quickreply_deletePendingReply_int')
+    }
+
+    getCurrentChannel() {
+      return getChannel(getChannelId())
+    }
+
+    async createPendingReply(
+      channel,
+      message,
+      shouldMention,
+      showMentionToggle
+    ) {
+      if (typeof showMentionToggle === 'undefined') {
+        showMentionToggle = channel.guild_id !== null // DM channel showMentionToggle = false
+      }
+      Dispatcher.dirtyDispatch({
+        type: ActionTypes.CREATE_PENDING_REPLY,
+        channel,
+        message,
+        shouldMention,
+        showMentionToggle,
+      })
+    }
+    async deletePendingReply(data) {
+      Dispatcher.dirtyDispatch({
+        type: ActionTypes.DELETE_PENDING_REPLY,
+        channelId: getChannelId(),
+        ...data,
+      })
+    }
+
+    channelSelect = (data) => {
+      if (this.activeChannel !== data.channelId) {
+        this.activeChannel = data.channelId
+        this.messageIndex = -1
+      }
+    }
+    onCreatePendingReply = (data) => {
+      if (this.replyingToMessage !== data.message.id) {
+        this.replyingToMessage = data.message.id
+      }
+    }
+    onDeletePendingReply = (data) => {
+      this.replyingToMessage = undefined
+      if (!data[this.QRSymbol]) {
+        this.messageIndex = -1
+      }
+    }
+
+    keyDown = async (event) => {
+      if (!event.ctrlKey) return
+      if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
+
+      let messages = await getMessages(getChannelId())
+      let msgArray = messages.toArray().reverse()
+
+      let lastIndex =
+        msgArray.findIndex((msg) => msg.id === this.replyingToMessage) || 0
+      if (event.key === 'ArrowUp') {
+        this.messageIndex = lastIndex + 1
+      } else if (event.key === 'ArrowDown') {
+        this.messageIndex = lastIndex - 1
+      }
+
+      if (this.messageIndex > msgArray.length)
+        this.messageIndex = msgArray.length
+      if (this.messageIndex < 0) {
+        return this.deletePendingReply()
+      }
+
+      let message = msgArray[this.messageIndex]
+      this.deletePendingReply({
+        [this.QRSymbol]: true,
+      })
+      this.createPendingReply(this.getCurrentChannel(), message, true)
+    }
+
+    startPlugin() {
+      Dispatcher.subscribe(ActionTypes.CHANNEL_SELECT, this.channelSelect)
+      Dispatcher.subscribe(
+        ActionTypes.CREATE_PENDING_REPLY,
+        this.onCreatePendingReply
+      )
+      Dispatcher.subscribe(
+        ActionTypes.DELETE_PENDING_REPLY,
+        this.onDeletePendingReply
+      )
+
+      window.addEventListener('keydown', this.keyDown)
+    }
+
+    pluginWillUnload() {
+      Dispatcher.unsubscribe(ActionTypes.CHANNEL_SELECT, this.channelSelect)
+      Dispatcher.unsubscribe(
+        ActionTypes.CREATE_PENDING_REPLY,
+        this.onCreatePendingReply
+      )
+      Dispatcher.unsubscribe(
+        ActionTypes.DELETE_PENDING_REPLY,
+        this.onDeletePendingReply
+      )
+      window.removeEventListener('keydown', this.keyDown)
+    }
+  }
+
+  let plugin = new QuickReply()
+  return {
+    onLoad() {
+      plugin.startPlugin()
+    },
+    onUnload() {
+      plugin.pluginWillUnload()
+    },
+  }
+})()
